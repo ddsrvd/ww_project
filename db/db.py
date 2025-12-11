@@ -1,8 +1,13 @@
 import psycopg2
 from psycopg2.extras import DictCursor
 from config import db_config
+from enum import Enum
+
 
 class db_api:
+    class FindBy(Enum):
+        NAME = 'name'
+        AUTHOR = 'author'
     @staticmethod
     def get_song(song_id: str):
         conn = None
@@ -132,7 +137,7 @@ class db_api:
                 conn.close()
 
     @staticmethod
-    def find_song(substraction, max_dist=5, number_of_results=5):
+    def find_song(substraction, max_dist=5, number_of_results=5, type_search=FindBy.NAME):
         conn = None
         try:
             conn = psycopg2.connect(
@@ -145,19 +150,35 @@ class db_api:
 
             cursor = conn.cursor(cursor_factory=DictCursor)
 
-            sql = """
-                SELECT 
-                    *,
-                    LEVENSHTEIN(LOWER(name_song), LOWER(%s)) as distance
-                FROM song 
-                WHERE LEVENSHTEIN(LOWER(name_song), LOWER(%s)) <= %s
-                ORDER BY distance
-                LIMIT %s
-                """
+            if type_search == db_api.FindBy.NAME:
+                sql = """
+                    SELECT 
+                        *,
+                        LEVENSHTEIN(LOWER(name_song), LOWER(%s)) as distance
+                    FROM song 
+                    WHERE LEVENSHTEIN(LOWER(name_song), LOWER(%s)) <= %s
+                    ORDER BY distance
+                    LIMIT %s
+                    """
 
-            cursor.execute(sql, (substraction, substraction, max(max_dist, len(substraction)//2), number_of_results))
+                cursor.execute(sql, (substraction, substraction, max(max_dist, len(substraction)//2), number_of_results))
+                result = cursor.fetchall()
 
-            result = cursor.fetchall()
+            elif type_search == db_api.FindBy.AUTHOR:
+                sql = """
+                                    SELECT 
+                                        *,
+                                        LEVENSHTEIN(LOWER(author), LOWER(%s)) as distance
+                                    FROM song 
+                                    WHERE LEVENSHTEIN(LOWER(author), LOWER(%s)) <= %s
+                                    AND author IS NOT NULL
+                                    ORDER BY distance
+                                    LIMIT %s
+                                    """
+
+                cursor.execute(sql, (substraction, substraction, max(max_dist, len(substraction) // 2), number_of_results))
+                result = cursor.fetchall()
+
             cursor.close()
             return result
 
@@ -169,4 +190,3 @@ class db_api:
         finally:
             if conn:
                 conn.close()
-
