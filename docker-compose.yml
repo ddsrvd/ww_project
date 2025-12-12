@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:17.6
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - songnet
+    restart: unless-stopped
+
+  db_api:
+    build: ./db_api
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      - db
+    networks:
+      - songnet
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    environment:
+      DB_API_URL: http://db_api:8001
+    ports:
+      - "8501:8501"  
+    depends_on:
+      - db_api
+    networks:
+      - songnet
+    restart: unless-stopped
+
+networks:
+  songnet:
+    driver: bridge
