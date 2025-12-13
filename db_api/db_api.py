@@ -1,7 +1,7 @@
 import psycopg2
-from psycopg2.extras import DictCursor
 from config import db_config
 from enum import Enum
+import asyncio
 
 
 class db_api:
@@ -9,7 +9,7 @@ class db_api:
         NAME = 'name'
         AUTHOR = 'author'
     @staticmethod
-    def get_song(song_id: str):
+    async def get_song(song_id: str):
         conn = None
         try:
             conn = psycopg2.connect(
@@ -20,7 +20,7 @@ class db_api:
                 dbname=db_config["dbname"]
             )
 
-            cursor = conn.cursor(cursor_factory=DictCursor)
+            cursor = conn.cursor()
 
             sql = "SELECT * FROM song WHERE song_id = %s"
             cursor.execute(sql, (song_id,))
@@ -38,7 +38,7 @@ class db_api:
 
 
     @staticmethod
-    def get_all_song():
+    async def get_all_song():
         conn = None
         try:
             conn = psycopg2.connect(
@@ -49,7 +49,7 @@ class db_api:
                 dbname=db_config["dbname"]
             )
 
-            cursor = conn.cursor(cursor_factory=DictCursor)
+            cursor = conn.cursor()
             cursor.execute("SELECT * FROM song")
 
             result = cursor.fetchall()
@@ -64,7 +64,7 @@ class db_api:
                 conn.close()
 
     @staticmethod
-    def song_in_db(song_name: str, author=None):
+    async def song_in_db(song_name: str, author=None):
         conn = None
         try:
             conn = psycopg2.connect(
@@ -75,7 +75,7 @@ class db_api:
                 dbname=db_config["dbname"]
             )
 
-            cursor = conn.cursor(cursor_factory=DictCursor)
+            cursor = conn.cursor()
 
             if not author:
                 # Ищем песни, где автор НЕ указан (NULL или пустая строка)
@@ -95,7 +95,7 @@ class db_api:
             if not r:
                 return False
             else:
-                return r[0]['song_id']
+                return r[0][0]
 
         except psycopg2.Error as e:
             print(f"Database error: {e}")
@@ -119,7 +119,7 @@ class db_api:
                 dbname=db_config["dbname"]
             )
 
-            cursor = conn.cursor(cursor_factory=DictCursor)
+            cursor = conn.cursor()
 
             sql = "INSERT INTO song(name_song, author) VALUES(%s, %s)"
             cursor.execute(sql, (song_name, author))
@@ -139,7 +139,7 @@ class db_api:
 
 
     @staticmethod
-    def user_in_db(user_tg_id: str):
+    async def user_in_db(user_tg_id: str):
         conn = None
         try:
             conn = psycopg2.connect(
@@ -150,7 +150,7 @@ class db_api:
                 dbname=db_config["dbname"]
             )
 
-            cursor = conn.cursor(cursor_factory=DictCursor)
+            cursor = conn.cursor()
 
 
             sql = "SELECT user_id, username FROM users WHERE user_tg_id = %s"
@@ -176,7 +176,7 @@ class db_api:
 
 
     @staticmethod
-    def create_user(username: str, user_tg_id=""):
+    async def create_user(username: str, user_tg_id=""):
         conn = None
         try:
             conn = psycopg2.connect(
@@ -187,7 +187,7 @@ class db_api:
                 dbname=db_config["dbname"]
             )
 
-            cursor = conn.cursor(cursor_factory=DictCursor)
+            cursor = conn.cursor()
 
             sql = "INSERT INTO users(username, user_tg_id) VALUES(%s, %s)"
             cursor.execute(sql, (username, user_tg_id))
@@ -219,7 +219,7 @@ class db_api:
                 port=db_config["port"],
                 dbname=db_config["dbname"]
             )
-            cursor = conn.cursor(cursor_factory=DictCursor)
+            cursor = conn.cursor()
 
             sql = "INSERT INTO review(review_author, review) VALUES(%s, %s) RETURNING review_id;"
             cursor.execute(sql, (username, review))
@@ -227,7 +227,7 @@ class db_api:
             new_review = cursor.fetchone()
             if not new_review:
                 return False
-            review_id = new_review['review_id'] if new_review else None
+            review_id = new_review[0] if new_review else None
 
             #Обновляем таблицу song
             sql = "SELECT review FROM song WHERE song_id = %s"
@@ -237,7 +237,7 @@ class db_api:
             if not song_result:
                 return False
 
-            current_song_reviews = song_result['review']
+            current_song_reviews = song_result[0]
 
             if current_song_reviews:
                 updated_song_reviews = list(current_song_reviews)
@@ -256,7 +256,7 @@ class db_api:
             if not user_result:
                 return False
 
-            current_user_reviews = user_result['user_review']
+            current_user_reviews = user_result[0]
 
             if current_user_reviews:
                 updated_user_reviews = list(current_user_reviews)
@@ -281,7 +281,7 @@ class db_api:
                 conn.close()
 
     @staticmethod
-    def get_song_review(song_id: str):
+    async def get_song_review(song_id: str):
         conn = None
         try:
             conn = psycopg2.connect(
@@ -292,7 +292,7 @@ class db_api:
                 dbname=db_config["dbname"]
             )
 
-            cursor = conn.cursor(cursor_factory=DictCursor)
+            cursor = conn.cursor()
 
             sql = '''
             SELECT r.review_id, r.review_author, r.review FROM song s
@@ -312,57 +312,68 @@ class db_api:
             if conn:
                 conn.close()
 
+
+
     @staticmethod
-    def find_song(substraction, max_dist=5, number_of_results=5, type_search=FindBy.NAME):
-        conn = None
-        try:
-            conn = psycopg2.connect(
-                host=db_config["host"],
-                user=db_config["user"],
-                password=db_config["password"],
-                port=db_config["port"],
-                dbname=db_config["dbname"]
-            )
+    async def find_song(substraction, max_dist=5, number_of_results=5, type_search='name'):
+        loop = asyncio.get_event_loop()
 
-            cursor = conn.cursor(cursor_factory=DictCursor)
+        def _sync_find_song():
+            conn = None
+            try:
+                conn = psycopg2.connect(
+                    host=db_config["host"],
+                    user=db_config["user"],
+                    password=db_config["password"],
+                    port=db_config["port"],
+                    dbname=db_config["dbname"]
+                )
 
-            if type_search == db_api.FindBy.NAME:
-                sql = """
-                    SELECT 
-                        *,
-                        LEVENSHTEIN(LOWER(name_song), LOWER(%s)) as distance
-                    FROM song 
-                    WHERE LEVENSHTEIN(LOWER(name_song), LOWER(%s)) <= %s
-                    ORDER BY distance
-                    LIMIT %s
-                    """
+                cursor = conn.cursor()
 
-                cursor.execute(sql, (substraction, substraction, len(substraction) // 2 + len(substraction) // 5, number_of_results))
-                result = cursor.fetchall()
+                if type_search == 'name':
+                    sql = """
+                        SELECT 
+                            *,
+                            LEVENSHTEIN(LOWER(name_song), LOWER(%s)) as distance
+                        FROM song 
+                        WHERE LEVENSHTEIN(LOWER(name_song), LOWER(%s)) <= %s
+                        ORDER BY distance
+                        LIMIT %s
+                        """
 
-            elif type_search == db_api.FindBy.AUTHOR:
-                sql = """
-                                    SELECT 
-                                        *,
-                                        LEVENSHTEIN(LOWER(author), LOWER(%s)) as distance
-                                    FROM song 
-                                    WHERE LEVENSHTEIN(LOWER(author), LOWER(%s)) <= %s
-                                    AND author IS NOT NULL
-                                    ORDER BY distance
-                                    LIMIT %s
-                                    """
+                    cursor.execute(sql, (
+                    substraction, substraction, len(substraction) // 2 + len(substraction) // 5, number_of_results))
+                    result = cursor.fetchall()
 
-                cursor.execute(sql, (substraction, substraction, len(substraction) // 2 + len(substraction) // 5, number_of_results))
-                result = cursor.fetchall()
+                elif type_search == 'author':
+                    sql = """
+                        SELECT 
+                            *,
+                            LEVENSHTEIN(LOWER(author), LOWER(%s)) as distance
+                        FROM song 
+                        WHERE LEVENSHTEIN(LOWER(author), LOWER(%s)) <= %s
+                        AND author IS NOT NULL
+                        ORDER BY distance
+                        LIMIT %s
+                        """
 
-            cursor.close()
-            return result
+                    cursor.execute(sql, (
+                    substraction, substraction, len(substraction) // 2 + len(substraction) // 5, number_of_results))
+                    result = cursor.fetchall()
 
-        except psycopg2.Error:
-            if conn:
-                conn.rollback()
-            return []
+                cursor.close()
+                return [list(row) for row in result]
 
-        finally:
-            if conn:
-                conn.close()
+            except psycopg2.Error:
+                if conn:
+                    conn.rollback()
+                return []
+
+            finally:
+                if conn:
+                    conn.close()
+
+        return await loop.run_in_executor(None, _sync_find_song)
+
+#db_api.create_song("zgsadfghsdfhgsdfh")
