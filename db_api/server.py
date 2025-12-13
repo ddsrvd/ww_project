@@ -1,46 +1,56 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Query
+import uvicorn
+import asyncio
+
 from db_api import db_api
 
 app = FastAPI()
 
-@app.get("/songs")
-def get_all_songs():
-    songs = db_api.get_all_song()
-    if songs is None:
-        return []
-    return [dict(song) for song in songs]
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
-@app.get("/songs/{song_id}")
-def get_song(song_id: str):
-    song = db_api.get_song(song_id)
-    if not song:
-        raise HTTPException(status_code=404, detail="Song not found")
-    return dict(song)
+@app.get("/user_in_db/{user_tg_id}")
+async def user_in_db(user_tg_id: str):
+    return await db_api.user_in_db(user_tg_id)
 
-@app.post("/songs")
-def add_song(name: str, author: str = None):
-    success = db_api.create_song(name, author)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to create song")
-    return {"status": "created"}
+@app.get("/create_user")
+async def create_user(user_name: str, user_tg_id: str):
+    return await db_api.create_user(user_name, user_tg_id)
 
-@app.post("/songs/{song_id}/reviews")
-def add_review(song_id: str, review: str):
-    success = db_api.create_review(song_id, review)
-    if not success:
-        raise HTTPException(status_code=404, detail="Song not found or failed to add review")
-    return {"status": "review added"}
+@app.get("/song_in_db")
+async def song_in_db(name_song: str, author: str = None):
+    return await db_api.song_in_db(name_song, author)
 
-@app.get("/search")
-def search(q: str, max_dist: int = 5, limit: int = 5, type_search: str = "NAME"):
-    from db_api import db_api
-    
-    if type_search.upper() == "AUTHOR":
-        search_type = db_api.FindBy.AUTHOR
-    else:
-        search_type = db_api.FindBy.NAME
-        
-    results = db_api.find_song(q, max_dist, limit, search_type)
-    if results is None:
-        return []
-    return [dict(r) for r in results]
+@app.get("/create_song") 
+async def create_song(name_song: str, author: str = None):
+    return db_api.create_song(name_song, author)
+
+@app.get("/get_song/{song_id}")
+async def get_song(song_id: int):
+    return await db_api.get_song(song_id)
+
+@app.get("/get_song_review/{song_id}")
+async def get_song_review(song_id: int):
+    return await db_api.get_song_review(song_id)
+
+@app.get("/create_review")
+async def create_review(user_name: str, user_id: str, song_id: str, comment: str): 
+    db_api.create_review(user_name, user_id, song_id, comment)
+    return True
+
+@app.get("/find_song")
+async def find_song(query: str, type_search: str = "name"):
+    result = await db_api.find_song(query, type_search=type_search)
+    return result
+
+# Получаем константы FindBy из db_api
+@app.get("/get_findby")
+async def get_findby():
+    return {
+        "AUTHOR": "author",  # Просто строки
+        "NAME": "name"
+    }
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
