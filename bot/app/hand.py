@@ -7,8 +7,7 @@ from aiogram.fsm.context import FSMContext
 from typing import List
 import app.keyboards as kb
 import app.States as st
-import db
-from db import db_api
+from app.db_client import client as db_api
 
 router = Router()
 
@@ -35,8 +34,8 @@ class Handlers:
     async def start(self, message: types.Message, state: FSMContext):
         user_name = message.from_user.first_name
         user_id = str(message.from_user.id)
-        if not db_api.user_in_db(user_id):
-            db_api.create_user(user_name, user_id)
+        if not await db_api.user_in_db(user_id):
+            await db_api.create_user(user_name, user_id)
 
         #create new user in table "users"
 
@@ -85,11 +84,11 @@ class Handlers:
             await state.update_data(get_author=message.text)
 
         data = await state.get_data()
-        if db_api.song_in_db(data["get_name"], data["get_author"]):
+        if await db_api.song_in_db(data["get_name"], data["get_author"]):
             await message.answer("Такой трек уже есть в базе данных, попробуйте еще раз!", reply_markup=kb.main)
         else:
-            db_api.create_song(data["get_name"], data["get_author"])
-            new_song = db_api.song_in_db(data["get_name"], data["get_author"])
+            await db_api.create_song(data["get_name"], data["get_author"])
+            new_song = await db_api.song_in_db(data["get_name"], data["get_author"])
             if new_song:
                 await message.answer("Трек успешно добавлен!", reply_markup=kb.main)
                 await message.answer(f'ID трека: {new_song}\nНазвание трека: {data["get_name"]}\nАвтор: {data["get_author"]}')
@@ -100,7 +99,7 @@ class Handlers:
 
 
     async def create_review(self, message: types.Message, state: FSMContext):
-        await message.answer(await self.print_song(db_api.get_song(message.text)))
+        await message.answer(await self.print_song(await db_api.get_song(message.text)))
         await state.set_state(st.Create_rev.id_song)
         await message.answer('Выберите действие', reply_markup=kb.answer)
         await state.update_data(id_song=message.text)
@@ -113,12 +112,12 @@ class Handlers:
 
         elif message.text == "Посмотреть комментарии":
             data = await state.get_data()
-            res = db_api.get_song_review(data["id_song"])
+            res = await db_api.get_song_review(data["id_song"])
             await message.answer("Комментарии:")
             num = 1
             if res:
                 for i in res:
-                    await message.answer(f'{num}) {i["review_author"]}: {i["review"]}')
+                    await message.answer(f'{num}) {i[1]}: {i[2]}')
                     num += 1
             else:
                 await message.answer("Комментариев пока нет")
@@ -130,12 +129,16 @@ class Handlers:
 
     async def create_review3(self, message: types.Message, state: FSMContext):
         user_name = message.from_user.first_name
-        user_tg_id = str(message.from_user.id)
-        user_id = db_api.user_in_db(user_tg_id)['user_id']
+        user_tg_id = message.from_user.id
+        user_id_1 = await db_api.user_in_db(user_tg_id)
+        if user_id_1:
+            user_id = user_id_1[0]
+        else:
+            await message.answer("Ошибка", reply_markup=kb.answer)
 
         await state.update_data(get_comment=message.text)
         data = await state.get_data()
-        db_api.create_review(user_name, user_id, data["id_song"], data["get_comment"])
+        await db_api.create_review(user_name, str(user_id), str(data["id_song"]), str(data["get_comment"]))
         await state.set_state(st.Create_rev.id_song)
         await message.answer("Комментарий добавлен!", reply_markup=kb.answer)
 
@@ -156,7 +159,8 @@ class Handlers:
     async def find_song_a1(self, message: types.Message, state: FSMContext):
         await state.update_data(s_author=message.text)
         data = await state.get_data()
-        res = db_api.find_song(data["s_author"], type_search=db_api.FindBy.AUTHOR)
+        type_search = db_api.FindBy.AUTHOR
+        res = await db_api.find_song(data["s_author"], type_search=type_search)
         if res:
             await message.answer("Вот треки, автор которых наиболее совпадает с вашим запросом:")
             for i in res:
@@ -170,7 +174,8 @@ class Handlers:
     async def find_song_t1(self, message: types.Message, state: FSMContext):
         await state.update_data(s_name=message.text)
         data = await state.get_data()
-        res = db_api.find_song(data["s_name"], type_search=db_api.FindBy.NAME)
+        type_search = db_api.FindBy.NAME
+        res = await db_api.find_song(data["s_name"], type_search=type_search)
         if res:
             await message.answer("Вот треки наиболее совпадающие с вашим запросом:")
             for i in res:
@@ -181,10 +186,10 @@ class Handlers:
         await state.set_state(st.UserMenu.SEARCHING)
 
     async def print_song(self, song):
-        if song["author"]:
-            return f'ID трека: {song["song_id"]}\nНазвание трека: {song["name_song"]}\nАвтор: {song["author"]}'
+        if song[2]:
+            return f'ID трека: {song[0]}\nНазвание трека: {song[1]}\nАвтор: {song[2]}'
         else:
-            return f'ID трека: {song["song_id"]}\nНазвание трека: {song["name_song"]}\nАвтор: неизвестно'
+            return f'ID трека: {song[0]}\nНазвание трека: {song[1]}\nАвтор: неизвестно'
 
 
 
