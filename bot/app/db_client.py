@@ -12,14 +12,12 @@ class SimpleClient:
         self.base_url = base_url
 
     async def _get(self, endpoint, params=None):
-        """Простой GET запрос"""
         url = f"{self.base_url}{endpoint}"
         async with aiohttp.ClientSession() as session:
             async with session.get(url, params=params) as response:
                 return await response.json()
 
     async def _post(self, endpoint, data=None):
-        """Простой POST запрос"""
         url = f"{self.base_url}{endpoint}"
         async with aiohttp.ClientSession() as session:
             async with session.post(url, data=data) as response:
