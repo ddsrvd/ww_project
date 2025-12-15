@@ -24,4 +24,15 @@ CREATE TABLE IF NOT EXISTS review
     PRIMARY KEY(review_id)
 );
 
+INSERT INTO song (name_song, author, review) VALUES
+('Bohemian Rhapsody', 'Queen', '{"Amazing classic!", "Timeless rock opera."}'),
+('Imagine', 'John Lennon', '{"Peaceful and hopeful.", "Universal message."}'),
+('Hotel California', 'Eagles', '{"Mysterious and iconic.", "Great guitar solo."}'),
+('Smells Like Teen Spirit', 'Nirvana', '{"Grunge anthem.", "Changed music in the 90s."}')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO users (user_id, username, user_tg_id) 
+VALUES (999, 'Web User', 'web_user')
+ON CONFLICT (user_id) DO NOTHING;
+
 CREATE EXTENSION IF NOT EXISTS fuzzystrmatch

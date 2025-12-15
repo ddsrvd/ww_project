@@ -1,10 +1,11 @@
 import asyncio
 import logging #удалить
-
-from config import TOKEN
+import os
 from app.hand import router
 
 from aiogram import Bot, Dispatcher
+
+TOKEN = os.getenv("TOKEN")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()

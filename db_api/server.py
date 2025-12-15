@@ -26,6 +26,10 @@ async def song_in_db(name_song: str, author: str = None):
 async def create_song(name_song: str, author: str = None):
     return db_api.create_song(name_song, author)
 
+@app.post("/create_web_song") 
+async def create_web_song(name_song: str, author: str = None):
+    return db_api.create_song(name_song, author)
+
 @app.get("/get_song/{song_id}")
 async def get_song(song_id: int):
     return await db_api.get_song(song_id)
@@ -35,9 +39,14 @@ async def get_song_review(song_id: int):
     return await db_api.get_song_review(song_id)
 
 @app.get("/create_review")
-async def create_review(user_name: str, user_id: str, song_id: str, comment: str): 
+def create_review(user_name: str, user_id: str, song_id: str, comment: str): 
     db_api.create_review(user_name, user_id, song_id, comment)
     return True
+
+@app.post("/create_web_review")
+def create_web_review(user_name: str, song_id: str, comment: str): 
+    result = db_api.create_review(user_name, "999", song_id, comment)
+    return result
 
 @app.get("/find_song")
 async def find_song(query: str, type_search: str = "name"):
@@ -50,6 +59,3 @@ async def get_findby():
         "AUTHOR": "author",
         "NAME": "name"
     }
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)

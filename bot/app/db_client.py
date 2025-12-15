@@ -1,15 +1,14 @@
 import aiohttp
 import asyncio
 from enum import Enum
+import os
+from dotenv import load_dotenv
 
+load_dotenv() 
 
 class SimpleClient:
-    class FindBy(Enum):
-        NAME = 'name'
-        AUTHOR = 'author'
-
-    def __init__(self, base_url="http://localhost:8000"):
-        self.base_url = base_url
+    def __init__(self, base_url=None):
+        self.base_url = base_url or os.getenv("DB_API_URL", "http://db_api:8001")
 
     async def _get(self, endpoint, params=None):
         url = f"{self.base_url}{endpoint}"

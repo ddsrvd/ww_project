@@ -8,18 +8,12 @@ class db_api:
     class FindBy(Enum):
         NAME = 'name'
         AUTHOR = 'author'
+    
     @staticmethod
     async def get_song(song_id: str):
         conn = None
         try:
-            conn = psycopg2.connect(
-                host=db_config["host"],
-                user=db_config["user"],
-                password=db_config["password"],
-                port=db_config["port"],
-                dbname=db_config["dbname"]
-            )
-
+            conn = psycopg2.connect(**db_config)
             cursor = conn.cursor()
 
             sql = "SELECT * FROM song WHERE song_id = %s"
@@ -27,7 +21,7 @@ class db_api:
 
             result = cursor.fetchall()
             cursor.close()
-            return result[0]
+            return result[0] if result else []
 
         except Exception:
             return []
@@ -36,19 +30,11 @@ class db_api:
             if conn:
                 conn.close()
 
-
     @staticmethod
     async def get_all_song():
         conn = None
         try:
-            conn = psycopg2.connect(
-                host=db_config["host"],
-                user=db_config["user"],
-                password=db_config["password"],
-                port=db_config["port"],
-                dbname=db_config["dbname"]
-            )
-
+            conn = psycopg2.connect(**db_config)
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM song")
 
@@ -67,18 +53,10 @@ class db_api:
     async def song_in_db(song_name: str, author=None):
         conn = None
         try:
-            conn = psycopg2.connect(
-                host=db_config["host"],
-                user=db_config["user"],
-                password=db_config["password"],
-                port=db_config["port"],
-                dbname=db_config["dbname"]
-            )
-
+            conn = psycopg2.connect(**db_config)
             cursor = conn.cursor()
 
             if not author:
-                # Ищем песни, где автор НЕ указан (NULL или пустая строка)
                 sql = """
                 SELECT song_id FROM song 
                 WHERE name_song = %s 
@@ -111,14 +89,7 @@ class db_api:
     def create_song(song_name: str, author=None):
         conn = None
         try:
-            conn = psycopg2.connect(
-                host=db_config["host"],
-                user=db_config["user"],
-                password=db_config["password"],
-                port=db_config["port"],
-                dbname=db_config["dbname"]
-            )
-
+            conn = psycopg2.connect(**db_config)
             cursor = conn.cursor()
 
             sql = "INSERT INTO song(name_song, author) VALUES(%s, %s)"
@@ -130,28 +101,19 @@ class db_api:
 
         except psycopg2.Error:
             if conn:
-                conn.rollback()  # Откатываем транзакцию при ошибке
+                conn.rollback()
             return False
 
         finally:
             if conn:
                 conn.close()
 
-
     @staticmethod
     async def user_in_db(user_tg_id: str):
         conn = None
         try:
-            conn = psycopg2.connect(
-                host=db_config["host"],
-                user=db_config["user"],
-                password=db_config["password"],
-                port=db_config["port"],
-                dbname=db_config["dbname"]
-            )
-
+            conn = psycopg2.connect(**db_config)
             cursor = conn.cursor()
-
 
             sql = "SELECT user_id, username FROM users WHERE user_tg_id = %s"
             cursor.execute(sql, (user_tg_id,))
@@ -174,98 +136,15 @@ class db_api:
             if conn:
                 conn.close()
 
-
     @staticmethod
     async def create_user(username: str, user_tg_id=""):
         conn = None
         try:
-            conn = psycopg2.connect(
-                host=db_config["host"],
-                user=db_config["user"],
-                password=db_config["password"],
-                port=db_config["port"],
-                dbname=db_config["dbname"]
-            )
-
+            conn = psycopg2.connect(**db_config)
             cursor = conn.cursor()
 
             sql = "INSERT INTO users(username, user_tg_id) VALUES(%s, %s)"
             cursor.execute(sql, (username, user_tg_id))
-
-            conn.commit()
-            cursor.close()
-            return True
-
-
-
-        except psycopg2.Error:
-            if conn:
-                conn.rollback()  # Откатываем транзакцию при ошибке
-            return False
-
-        finally:
-            if conn:
-                conn.close()
-
-
-    @staticmethod
-    def create_review(username: str, user_id: str,  song_id: str, review: str):
-        conn = None
-        try:
-            conn = psycopg2.connect(
-                host=db_config["host"],
-                user=db_config["user"],
-                password=db_config["password"],
-                port=db_config["port"],
-                dbname=db_config["dbname"]
-            )
-            cursor = conn.cursor()
-
-            sql = "INSERT INTO review(review_author, review) VALUES(%s, %s) RETURNING review_id;"
-            cursor.execute(sql, (username, review))
-
-            new_review = cursor.fetchone()
-            if not new_review:
-                return False
-            review_id = new_review[0] if new_review else None
-
-            #Обновляем таблицу song
-            sql = "SELECT review FROM song WHERE song_id = %s"
-            cursor.execute(sql, (song_id,))
-            song_result = cursor.fetchone()
-
-            if not song_result:
-                return False
-
-            current_song_reviews = song_result[0]
-
-            if current_song_reviews:
-                updated_song_reviews = list(current_song_reviews)
-                updated_song_reviews.append(str(review_id))
-            else:
-                updated_song_reviews = [str(review_id)]
-
-            sql = "UPDATE song SET review = %s WHERE song_id = %s;"
-            cursor.execute(sql, (updated_song_reviews, song_id))
-
-            # Обновляем таблицу users
-            sql = "SELECT user_review FROM users WHERE user_id = %s"
-            cursor.execute(sql, (user_id,))
-            user_result = cursor.fetchone()
-
-            if not user_result:
-                return False
-
-            current_user_reviews = user_result[0]
-
-            if current_user_reviews:
-                updated_user_reviews = list(current_user_reviews)
-                updated_user_reviews.append(str(review_id))
-            else:
-                updated_user_reviews = [str(review_id)]
-
-            sql = "UPDATE users SET user_review = %s WHERE user_id = %s;"
-            cursor.execute(sql, (updated_user_reviews, user_id))
 
             conn.commit()
             cursor.close()
@@ -281,17 +160,79 @@ class db_api:
                 conn.close()
 
     @staticmethod
+    def create_review(username: str, user_id: str, song_id: str, review: str):
+        conn = None
+        try:
+            conn = psycopg2.connect(**db_config)
+            cursor = conn.cursor()
+
+            
+            sql = "INSERT INTO review(review_author, review) VALUES(%s, %s) RETURNING review_id;"
+            cursor.execute(sql, (username, review))
+            new_review = cursor.fetchone()
+            
+            if not new_review:
+                return False
+            review_id = new_review[0]
+
+            # 2. Обновляем таблицу song
+            sql = "SELECT review FROM song WHERE song_id = %s"
+            cursor.execute(sql, (song_id,))
+            song_result = cursor.fetchone()
+
+            if not song_result:
+                return False
+
+            current_song_reviews = song_result[0]
+            if current_song_reviews:
+                updated_song_reviews = list(current_song_reviews)
+                updated_song_reviews.append(str(review_id))
+            else:
+                updated_song_reviews = [str(review_id)]
+
+            sql = "UPDATE song SET review = %s WHERE song_id = %s;"
+            cursor.execute(sql, (updated_song_reviews, song_id))
+
+            # 3. Пытаемся обновить users, но не прерываемся если не получилось
+            try:
+                user_id_int = int(user_id)
+                sql = "SELECT user_review FROM users WHERE user_id = %s"
+                cursor.execute(sql, (user_id_int,))
+                user_result = cursor.fetchone()
+
+                if user_result:
+                    current_user_reviews = user_result[0]
+                    if current_user_reviews:
+                        updated_user_reviews = list(current_user_reviews)
+                        updated_user_reviews.append(str(review_id))
+                    else:
+                        updated_user_reviews = [str(review_id)]
+
+                    sql = "UPDATE users SET user_review = %s WHERE user_id = %s;"
+                    cursor.execute(sql, (updated_user_reviews, user_id_int))
+            except (ValueError, psycopg2.Error):
+                # Если user_id не число или пользователя нет - игнорируем
+                # Web-пользователи могут не быть в таблице users
+                pass
+
+            conn.commit()
+            cursor.close()
+            return True
+
+        except psycopg2.Error as e:
+            print(f"Database error in create_review: {e}")
+            if conn:
+                conn.rollback()
+            return False
+        finally:
+            if conn:
+                conn.close()
+
+    @staticmethod
     async def get_song_review(song_id: str):
         conn = None
         try:
-            conn = psycopg2.connect(
-                host=db_config["host"],
-                user=db_config["user"],
-                password=db_config["password"],
-                port=db_config["port"],
-                dbname=db_config["dbname"]
-            )
-
+            conn = psycopg2.connect(**db_config)
             cursor = conn.cursor()
 
             sql = '''
@@ -312,8 +253,6 @@ class db_api:
             if conn:
                 conn.close()
 
-
-
     @staticmethod
     async def find_song(substraction, max_dist=5, number_of_results=5, type_search='name'):
         loop = asyncio.get_event_loop()
@@ -321,14 +260,7 @@ class db_api:
         def _sync_find_song():
             conn = None
             try:
-                conn = psycopg2.connect(
-                    host=db_config["host"],
-                    user=db_config["user"],
-                    password=db_config["password"],
-                    port=db_config["port"],
-                    dbname=db_config["dbname"]
-                )
-
+                conn = psycopg2.connect(**db_config)
                 cursor = conn.cursor()
 
                 if type_search == 'name':
@@ -375,5 +307,3 @@ class db_api:
                     conn.close()
 
         return await loop.run_in_executor(None, _sync_find_song)
-
-#db_api.create_song("zgsadfghsdfhgsdfh")
