@@ -44,11 +44,10 @@ async def find_song(query: str, type_search: str = "name"):
     result = await db_api.find_song(query, type_search=type_search)
     return result
 
-# Получаем константы FindBy из db_api
 @app.get("/get_findby")
 async def get_findby():
     return {
-        "AUTHOR": "author",  # Просто строки
+        "AUTHOR": "author",
         "NAME": "name"
     }
 
