@@ -7,6 +7,14 @@ main = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text="Написать/Посмотреть комментарий")],
 ], resize_keyboard=True)
 
+my_reviews = ReplyKeyboardMarkup(keyboard=[
+    [KeyboardButton(text="Мои рецензии")],
+    [KeyboardButton(text="Найти трек")],
+    [KeyboardButton(text="Добавить трек")],
+    [KeyboardButton(text="Написать/Посмотреть комментарий")],
+    [KeyboardButton(text="Получить код для сайта")],
+], resize_keyboard=True)
+
 find = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text="Поиск по автору")],
     [KeyboardButton(text="Поиск по треку")],
@@ -22,4 +30,3 @@ answer = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text="Посмотреть комментарии")],
     [KeyboardButton(text="Другой трек")],
 ], resize_keyboard=True)
-

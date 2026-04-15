@@ -6,9 +6,8 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data #постоянное хранилище постгреса
-
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro # скрипт для создания таблиц
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - songnet
     restart: unless-stopped
@@ -32,19 +31,32 @@ services:
     environment:
       DB_API_URL: ${DB_API_URL}
       TOKEN: ${TOKEN}
+      WORKER_URL: ${WORKER_URL:-http://worker:8002}
     depends_on:
       - db_api
+      - worker
     networks:
       - songnet
     restart: unless-stopped
+
+  worker:
+    build: ./worker
+    environment:
+      API_KEY: ${API_KEY}
+    networks:
+      - songnet
+    restart: unless-stopped
+
   web:
     build: ./web
     environment:
       DB_API_URL: ${DB_API_URL}
+      WORKER_URL: ${WORKER_URL:-http://worker:8002}
     ports:
-      - "8501:8501"  
+      - "8501:8501"
     depends_on:
       - db_api
+      - worker
     networks:
       - songnet
     restart: unless-stopped

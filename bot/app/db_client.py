@@ -8,7 +8,7 @@ load_dotenv()
 
 class SimpleClient:
     def __init__(self, base_url=None):
-        self.base_url = base_url or os.getenv("DB_API_URL", "http://db_api:8001")
+        self.base_url = base_url or os.getenv("DB_API_URL")  
 
     async def _get(self, endpoint, params=None):
         url = f"{self.base_url}{endpoint}"
@@ -19,7 +19,7 @@ class SimpleClient:
     async def _post(self, endpoint, data=None):
         url = f"{self.base_url}{endpoint}"
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=data) as response:
+            async with session.post(url, json=data) as response:  
                 return await response.json()
 
     async def user_in_db(self, user_tg_id):
@@ -58,10 +58,25 @@ class SimpleClient:
     async def find_song(self, query, type_search="name"):
         return await self._get("/find_song", {"query": query, "type_search": type_search})
 
+    async def create_auth_code(self, user_tg_id: str, username: str, code: str, expires_minutes: int = 5):
+        """Создает временный код для авторизации через API"""
+        return await self._post("/create_auth_code", {
+            "user_tg_id": user_tg_id,
+            "username": username,
+            "code": code,
+            "expires_minutes": expires_minutes
+        })
+
+    async def verify_auth_code(self, code: str):
+        """Проверяет временный код через API"""
+        return await self._post("/verify_auth_code", {"code": code})
+
+    async def get_user_reviews(self, user_tg_id: str):
+        """Получает все рецензии пользователя через API"""
+        return await self._get(f"/user_reviews/{user_tg_id}")
+
     class FindBy:
         AUTHOR = "author"
         NAME = "name"
-
-
 
 client = SimpleClient()
